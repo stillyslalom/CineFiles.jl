@@ -3,7 +3,7 @@ module CineFiles
 using ImageCore: N0f8, N4f12, Gray
 using LRUCache
 
-import Base: eltype, length, size, getindex, iterate
+import Base: eltype, length, size, getindex, firstindex, lastindex, iterate
 export CineFile
 
 # using FileIO
@@ -107,23 +107,35 @@ struct CineFile{T}
     data::LRU{Int, Array{T,2}}
 end
 
-function CineFile(filepath, limit=0.25)
+"""
+    CineFile(filepath, cachelimit=0.25)
+
+Load header information and create a frame cache for a Phantom .cine file.
+    `cachelimit` sets the maximum size of the frame cache as a fraction of
+    your system's free RAM. Indexing and iteration is supported for CineFiles.
+
+"""
+function CineFile(filepath, cachelimit=0.25)
     header = CineHeader(filepath)
     framesize = Base.summarysize(header.tmp)
-    maxcachedframes = ceil(Int, limit*Sys.free_memory() / framesize)
+    maxcachedframes = ceil(Int, cachelimit*Sys.free_memory() / framesize)
     data = LRU{Int, Array{eltype(header),2}}(maxsize = maxcachedframes)
     return CineFile(filepath, header, data)
-end
-
-function getindex(CineFile, idx)
-    get!(CineFile.data, idx) do
-        readframe(CineFile.path, CineFile.header, idx)
-    end
 end
 
 Base.length(cf::CineFile) = length(cf.header.dt)
 Base.eltype(cf::CineFile) = typeof(cf.header.tmp)
 Base.size(cf::CineFile) = (length(cf), size(cf.header.tmp, 2), size(cf.header.tmp, 1))
+
+function Base.getindex(cf::CineFile, idx::Int)
+    get!(cf.data, idx) do
+        readframe(cf.path, cf.header, idx)
+    end
+end
+Base.firstindex(cf::CineFile) = 1
+Base.lastindex(cf::CineFile) = length(cf)
+Base.getindex(cf::CineFile, I) = [cf[i] for i in I]
+
 Base.iterate(cf::CineFile, state=1) = state > length(cf) ? nothing : (cf[state], state + 1)
 
 end
