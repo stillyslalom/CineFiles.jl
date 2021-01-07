@@ -1,10 +1,11 @@
-name = "CineReader"
+name = "CineFiles"
 uuid = "56ba7af4-1aa7-4a85-af25-aa88a55212a9"
 authors = ["Alex Ames <alexander.m.ames@gmail.com> and contributors"]
 version = "0.1.0"
 
 [deps]
 ImageCore = "a09fc81d-aa75-5fe9-8630-4744c3626534"
+LRUCache = "8ac3fa9e-de4c-5943-b1dc-09c6b5f20637"
 
 [compat]
 julia = "1"

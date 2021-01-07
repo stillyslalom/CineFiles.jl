@@ -1,6 +1,6 @@
-using CineReader
+using CineFiles
 using Test
 
-@testset "CineReader.jl" begin
+@testset "CineFiles.jl" begin
     # Write your tests here.
 end

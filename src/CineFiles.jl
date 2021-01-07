@@ -1,7 +1,10 @@
-module CineReader
+module CineFiles
 
 using ImageCore: N0f8, N4f12, Gray
-export CineHeader, readframe!, readframe, readcine
+using LRUCache
+
+import Base: eltype, length, size, getindex, iterate
+export CineFile
 
 # using FileIO
 # add_format(format"CINE", [0x43, 0x49], ".cine")
@@ -85,6 +88,8 @@ function CineHeader(fname)
     end
 end
 
+Base.eltype(h::CineHeader{T}) where {T} = T
+
 function readframe!(f::IO, frame, h, frameidx)
     frameidx <= h.cine.ImageCount || error("tried to access nonexistent frame $frameidx")
     seek(f, h.imglocs[frameidx])
@@ -96,12 +101,29 @@ end
 readframe!(filename, frame, h, frameidx) = open(f -> readframe!(f, frame, h, frameidx), filename)
 readframe(f, h, frameidx) = readframe!(f, rotl90(h.tmp), h, frameidx)
 
-function readcine(fname)
-    hdr = CineHeader(fname)
-    img = open(fname) do f
-        map(i -> readframe(f, hdr, i), eachindex(hdr.dt))
-    end
-    return (; img, hdr)
+struct CineFile{T}
+    path::String
+    header::CineHeader{T}
+    data::LRU{Int, Array{T,2}}
 end
+
+function CineFile(filepath, limit=0.25)
+    header = CineHeader(filepath)
+    framesize = Base.summarysize(header.tmp)
+    maxcachedframes = ceil(Int, limit*Sys.free_memory() / framesize)
+    data = LRU{Int, Array{eltype(header),2}}(maxsize = maxcachedframes)
+    return CineFile(filepath, header, data)
+end
+
+function getindex(CineFile, idx)
+    get!(CineFile.data, idx) do
+        readframe(CineFile.path, CineFile.header, idx)
+    end
+end
+
+Base.length(cf::CineFile) = length(cf.header.dt)
+Base.eltype(cf::CineFile) = typeof(cf.header.tmp)
+Base.size(cf::CineFile) = (length(cf), size(cf.header.tmp, 2), size(cf.header.tmp, 1))
+Base.iterate(cf::CineFile, state=1) = state > length(cf) ? nothing : (cf[state], state + 1)
 
 end
