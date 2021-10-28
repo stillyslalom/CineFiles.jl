@@ -1,6 +1,6 @@
 module CineFiles
 
-using ImageCore: N0f8, N4f12, Gray
+using ColorTypes: N0f8, N4f12, Gray
 using LRUCache
 
 import Base: eltype, length, size, getindex, firstindex, lastindex, iterate
