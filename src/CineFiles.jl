@@ -91,15 +91,22 @@ end
 Base.eltype(h::CineHeader{T}) where {T} = T
 
 function readframe!(f::IO, frame, h, frameidx)
-    frameidx <= h.cine.ImageCount || error("tried to access nonexistent frame $frameidx")
+    1 <= frameidx <= h.cine.ImageCount || BoundsError(h.dt, frameidx)
     seek(f, h.imglocs[frameidx])
     skip(f, read(f, UInt32) - 4)
     read!(f, h.tmp)
-    frame .= rotl90(h.tmp)
+
+    # non-allocating version of rotl90
+    ind1, ind2 = axes(h.tmp)
+    n = first(ind2) + last(ind2)
+    for i in axes(h.tmp, 1), j in ind2
+        frame[n - j, i] = h.tmp[i, j]
+    end
+    return frame
 end
 
 readframe!(filename, frame, h, frameidx) = open(f -> readframe!(f, frame, h, frameidx), filename)
-readframe(f, h, frameidx) = readframe!(f, rotl90(h.tmp), h, frameidx)
+readframe(f, h, frameidx) = readframe!(f, similar(h.tmp, size(h.tmp, 2), size(h.tmp, 1)), h, frameidx)
 
 struct CineFile{T}
     path::String
