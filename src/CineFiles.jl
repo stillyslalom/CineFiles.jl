@@ -2,6 +2,7 @@ module CineFiles
 
 using ColorTypes: N0f8, N4f12, Gray
 using LRUCache
+using StaticArrays
 
 import Base: eltype, length, size, getindex, firstindex, lastindex, iterate
 export CineFile
@@ -13,6 +14,202 @@ struct Time64
     fractions::UInt32
     seconds::UInt32
 end
+
+
+struct WBgain
+	R::Float32
+	B::Float32
+end
+
+struct IMfilter
+	Dim::Int32
+	Shifts::Int32
+	Bias::Int32
+	Coef::SMatrix{5,5,Int32,5*5}
+end
+
+struct Rect
+	Left::Int32
+	Top::Int32
+	Right::Int32
+	Bottom::Int32
+end
+
+struct TimeCode
+	framesU::UInt8
+    framesT::UInt8
+    dropFrameFlag::UInt8
+    colorFrameFlag::UInt8
+    secondsU::UInt8
+    secondsT::UInt8
+    flag1::UInt8
+    minutesU::UInt8
+    minutesT::UInt8
+    flag2::UInt8
+    hoursU::UInt8
+    hoursT::UInt8
+    flag3::UInt8
+    flag4::UInt8
+    userBitData::UInt32
+end
+
+struct SetupHeaderq
+	FrameRate16::UInt16
+	Shutter16::UInt16
+	PostTrigger16::UInt16
+	FrameDelay16::UInt16
+	AspectRatio::UInt16
+	Res7::UInt16
+	Res8::UInt16
+	Res9::UInt8
+	Res10::UInt8
+	Res11::UInt8
+	TrigFrame::UInt8
+	Res12::UInt8
+	DescriptionOld::SVector{121,Char}
+	Mark::UInt16
+	Length::UInt16
+	Res13::UInt16
+	SigOption::UInt16
+	BinChannels::Int16
+	SamplesPerImage::UInt8
+	BinName::SMatrix{8,11,Char,8*11}
+	AnaOption::UInt16
+	AnaChannels::Int16
+	Res6::UInt8
+	AnaBoard::UInt8
+	ChOption::SVector{8,Int16}
+	AnaGain::SVector{8,Float32}
+	AnaUnit::SMatrix{8,6,Char,8*6}
+	AnaName::SMatrix{8,11,Char,8*11}
+	lFirstImage::Int32
+	dwImageCount::UInt32
+	nQFactor::Int16
+	wCineFileType::UInt16
+	szCinePath::SMatrix{4,65,Char,4*65}
+	Res14::UInt16
+	Res15::UInt8
+	Res16::UInt8
+	Res17::UInt16
+	Res18::Float64
+	Res19::Float64
+	Res20::UInt16
+	Res1::Int32
+	Res2::Int32
+	Res3::Int32
+	ImWidth::UInt16
+	ImHeight::UInt16
+	EDRShutter16::UInt16
+	Serial::UInt32
+	Saturation::Int32
+	Res5::UInt8
+	AutoExposure::UInt32
+	bFlipH::SVector{4,Bool}
+	bFlipV::SVector{4,Bool}
+	Grid::UInt32
+	FrameRate::UInt32
+	Shutter::UInt32
+	EDRShutter::UInt32
+	PostTrigger::UInt32
+	FrameDelay::UInt32
+	bEnableColor::SVector{4,Bool}
+	CameraVersion::UInt32
+	FirmwareVersion::UInt32
+	SoftwareVersion::UInt32
+	RecordingTimeZone::Int32
+	CFA::UInt32
+	Bright::Int32
+	Contrast::Int32
+	Gamma::Int32
+	Res21::UInt32
+	AutoExpLevel::UInt32
+	AutoExpSpeed::UInt32
+	AutoExpRect::Rect
+	WBGain::SVector{4,WBgain}
+	Rotate::Int32
+	WBView::WBgain
+	RealBPP::UInt32
+	Conv8Min::UInt32
+	Conv8Max::UInt32
+	FilterCode::Int32
+	FilterParam::Int32
+	UF::IMfilter
+	BlackCalSVer::UInt32
+	WhiteCalSVer::UInt32
+	GrayCalSVer::UInt32
+	bStampTime::SVector{4,Bool}
+	SoundDest::UInt32
+	FRPSteps::UInt32
+	FRPImgNr::SVector{16,Int32}
+	FRPRate::SVector{16,UInt32}
+	FRPExp::SVector{16,UInt32}
+	MCCnt::Int32
+	MCPercent::SVector{64,Float32}
+	CICalib::UInt32
+	CalibWidth::UInt32
+	CalibHeight::UInt32
+	CalibRate::UInt32
+	CalibExp::UInt32
+	CalibEDR::UInt32
+	CalibTemp::UInt32
+	HeadSerial::SVector{4,UInt32}
+	RangeCode::UInt32
+	RangeSize::UInt32
+	Decimation::UInt32
+	MasterSerial::UInt32
+	Sensor::UInt32
+	ShutterNs::UInt32
+	EDRShutterNs::UInt32
+	FrameDelayNs::UInt32
+	ImPosXAcq::UInt32
+	ImPosYAcq::UInt32
+	ImWidthAcq::UInt32
+	ImHeightAcq::UInt32
+	Description::SVector{4096,Char}
+	RisingEdge::SVector{4,Bool}
+	FilterTime::UInt32
+	LongReady::SVector{4,Bool}
+	ShutterOff::SVector{4,Bool}
+	Res4::SVector{16,UInt8}
+	bMetaWB::SVector{4,Bool}
+	Hue::Int32
+	BlackLevel::Int32
+	WhiteLevel::Int32
+	LensDescription::SVector{256,Char}
+	LensAperture::Float32
+	LensFocusDistance::Float32
+	LensFocalLength::Float32
+	fOffset::Float32
+	fGain::Float32
+	fSaturation::Float32
+	fHue::Float32
+	fGamma::Float32
+	fGammaR::Float32
+	fGammaB::Float32
+	fFlare::Float32
+	fPedestalR::Float32
+	fPedestalG::Float32
+	fPedestalB::Float32
+	fChroma::Float32
+	ToneLabel::SVector{256,Char}
+	TonePoints::Int32
+	fTone::SVector{64,Float32}
+	UserMatrixLabel::SVector{256,Char}
+	EnableMatrices::SVector{4,Bool}
+	fUserMatrix::SVector{9,Float32}
+	EnableCrop::SVector{4,Bool}
+	CropRect::Rect
+	EnableResample::SVector{4,Bool}
+	ResampleWidth::UInt32
+	ResampleHeight::UInt32
+	fGain16_8::Float32
+	FRPShape::SVector{16,UInt32}
+	TrigTC::TimeCode
+	fPbRate::Float32
+	fTcRate::Float32
+	CineName::SVector{256,Char}
+end
+
 
 struct CineFileHeader
     Type::UInt16
@@ -49,6 +246,7 @@ readstruct(f, S::T) where {T} = only(read!(f, Vector{S}(undef, 1)))
 struct CineHeader{T}
     cine::CineFileHeader
     bitmap::BitmapInfoHeader
+	setup::SetupHeader
     imglocs::Vector{Int64}
     imgoffset::Int
     dt::Vector{Float64}
@@ -68,6 +266,9 @@ function CineHeader(fname)
 
         seek(f, cine.OffImageOffsets)
         imglocs = read!(f, Array{Int64}(undef, cine.ImageCount))
+
+		seek(f, cine.OffSetup)
+		setup = readstruct(f, SetupHeader)
 
         seekstart(f)
         imgoffset = 1
