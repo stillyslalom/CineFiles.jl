@@ -285,7 +285,7 @@ function CineHeader(fname)
         end
 
         tmp = Array{bittype, 2}(undef, bitmap.Width, bitmap.Height)
-        return CineHeader{bittype}(cine, bitmap, imglocs, imgoffset, dt, tmp)
+        return CineHeader{bittype}(cine, bitmap, setup, imglocs, imgoffset, dt, tmp)
     end
 end
 
