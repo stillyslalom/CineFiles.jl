@@ -13,7 +13,6 @@ export CineFile
 abstract type BinaryData end
 
 read(f::IOStream, S::Type{T}) where {T<:BinaryData} = S(read.(Ref(f), S.types)...)
-read(f::AbstractString, S::Type{T}) where {T<:BinaryData} = S(read.(f, S.types)...)
 
 struct Time64 <: BinaryData
     fractions::UInt32
@@ -108,15 +107,15 @@ struct SetupHeader <: BinaryData
     Saturation::Int32
     Res5::UInt8
     AutoExposure::UInt32
-    bFlipH::SizedVector{4,Bool}
-    bFlipV::SizedVector{4,Bool}
+    bFlipH::Int32
+    bFlipV::Int32
     Grid::UInt32
     FrameRate::UInt32
     Shutter::UInt32
     EDRShutter::UInt32
     PostTrigger::UInt32
     FrameDelay::UInt32
-    bEnableColor::SizedVector{4,Bool}
+    bEnableColor::Int32
     CameraVersion::UInt32
     FirmwareVersion::UInt32
     SoftwareVersion::UInt32
@@ -141,7 +140,7 @@ struct SetupHeader <: BinaryData
     BlackCalSVer::UInt32
     WhiteCalSVer::UInt32
     GrayCalSVer::UInt32
-    bStampTime::SizedVector{4,Bool}
+    bStampTime::Int32
     SoundDest::UInt32
     FRPSteps::UInt32
     FRPImgNr::SizedVector{16,Int32}
@@ -170,12 +169,12 @@ struct SetupHeader <: BinaryData
     ImWidthAcq::UInt32
     ImHeightAcq::UInt32
     Description::SizedVector{4096,Int8}
-    RisingEdge::SizedVector{4,Bool}
+    RisingEdge::Int32
     FilterTime::UInt32
-    LongReady::SizedVector{4,Bool}
-    ShutterOff::SizedVector{4,Bool}
+    LongReady::Int32
+    ShutterOff::Int32
     Res4::SizedVector{16,UInt8}
-    bMetaWB::SizedVector{4,Bool}
+    bMetaWB::Int32
     Hue::Int32
     BlackLevel::Int32
     WhiteLevel::Int32
@@ -199,11 +198,11 @@ struct SetupHeader <: BinaryData
     TonePoints::Int32
     fTone::SizedVector{64,Float32}
     UserMatrixLabel::SizedVector{256,Int8}
-    EnableMatrices::SizedVector{4,Bool}
+    EnableMatrices::Int32
     fUserMatrix::SizedVector{9,Float32}
-    EnableCrop::SizedVector{4,Bool}
+    EnableCrop::Int32
     CropRect::Rect
-    EnableResample::SizedVector{4,Bool}
+    EnableResample::Int32
     ResampleWidth::UInt32
     ResampleHeight::UInt32
     fGain16_8::Float32
