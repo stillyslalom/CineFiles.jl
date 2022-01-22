@@ -1,7 +1,44 @@
 using CineFiles
 using ImageCore
+using Images: load
 using TiffImages
 using Test
+using Glob
+using XMLDict: parse_xml
+
+"""
+In order to test against arbitary cine files, export tif image of first frame with gamma = 1 and xml file using PCC. Ensure the cine file, tif image and xml file have the same name and place in either data or proprietary_data folders.
+
+"""
+
+struct cine_test_files
+    cine_path::String
+    xml_path::String
+    first_frame_path::String
+end
+
+function cine_test_files(cine_path::String)
+    base_name = splitext(cine_path)[1]
+    xml_path = base_name * ".xml"
+    first_frame_path = base_name * ".tif"
+    paths = (cine_path, xml_path, first_frame_path)
+    exists = isfile.(paths)
+    if all(exists)
+        cine_test_files(paths...)
+    else
+        @error "Missing file(s) $(paths[[.~exists...]])"
+    end
+end
+
+function compare_images(cine_file, tiff_image, frame_no = 1)
+    cine_frame = cine_file[frame_no]
+    cine_frame_gamma = (cine_frame) .+ cine_file.header.setup.fOffset
+    # Have not included gamma adjustment yet
+    cine_frame_gamma[cine_frame_gamma.<0] .= 0
+    return all(isapprox.(cine_frame_gamma, tiff_image; atol = 0.01))
+end
+
+cine_file_paths = cine_test_files.(glob("*.cine", "data"))
 
 @testset "CineFiles.jl" begin
     cf8 = CineFile(joinpath("data", "8bpp.cine"))
@@ -18,13 +55,29 @@ using Test
         @test eltype(cf12) == Matrix{Gray{N4f12}}
     end
 
-    @test Float32.(cf12[1]) ≈ Float32.(cf8[1]) atol=0.1
+    @test cf12[1] ≈ cf8[1]
 
     first_load_time = (@elapsed cf12[2])
     cached_load_time = (@elapsed cf12[2])
     @show first_load_time, cached_load_time
     @test first_load_time > cached_load_time
 
-    # TODO: add comparison to tiff. 
-    # TiffImages.jl cannot currently read the Phantom-exported tiff format.
+    @testset "Tiff compare first frame" begin
+        for file in cine_file_paths
+            @info file.cine_path
+            cf = CineFile(file.cine_path)
+            tiff_img = load(file.first_frame_path)
+            @test compare_images(cf, tiff_img)
+        end
+    end
+
+    @testset "XML compare camera version" begin
+        for file in cine_file_paths
+            @info file.cine_path
+            cf = CineFile(file.cine_path)
+            xml_data = parse_xml(read(file.xml_path, String))
+            @test Int(cf.header.setup.CameraVersion) == parse(Int, xml_data["CameraSetup"]["CameraVersion"])
+        end
+    end
 end
+
