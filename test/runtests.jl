@@ -39,6 +39,7 @@ function compare_images(cine_file, tiff_image, frame_no = 1)
 end
 
 cine_file_paths = cine_test_files.(glob("*.cine", "data"))
+append!(cine_file_paths, cine_test_files.(glob("*.cine", "proprietary_data")))
 
 @testset "CineFiles.jl" begin
     cf8 = CineFile(joinpath("data", "8bpp.cine"))
