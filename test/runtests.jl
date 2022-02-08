@@ -5,11 +5,11 @@ using TiffImages
 using Test
 using Glob
 using XMLDict: parse_xml
+using FixedPointNumbers: nbitsfrac
 
-"""
-In order to test against arbitary cine files, export tif image of first frame with gamma = 1 and xml file using PCC. Ensure the cine file, tif image and xml file have the same name and place in either data or proprietary_data folders.
-
-"""
+# In order to test against arbitary cine files, export tif image of first frame with gamma = 1
+# and xml file using PCC. Ensure the cine file, tif image and xml file have the same name and 
+# place in either data or proprietary_data folders.
 
 struct cine_test_files
     cine_path::String
@@ -42,7 +42,14 @@ cine_file_paths = cine_test_files.(glob("*.cine", "data"))
 append!(cine_file_paths, cine_test_files.(glob("*.cine", "proprietary_data")))
 
 @testset "CineFiles.jl" begin
-    cf8 = CineFile(joinpath("data", "8bpp.cine"))
+    @testset "Dependency internals" begin
+        # nbitsfrac is unexported, so we'll test to make sure it doesn't break
+        @test nbitsfrac(N0f8)  == 8
+        @test nbitsfrac(N4f12) == 12
+        @test nbitsfrac(N0f16) == 16
+    end
+    
+    @time cf8 = CineFile(joinpath("data", "8bpp.cine"))
     @testset "8 bit grayscale" begin
         @test length(cf8) == 202
         @test size(cf8[1]) == (16, 128)
@@ -77,7 +84,8 @@ append!(cine_file_paths, cine_test_files.(glob("*.cine", "proprietary_data")))
             @info file.cine_path
             cf = CineFile(file.cine_path)
             xml_data = parse_xml(read(file.xml_path, String))
-            @test Int(cf.header.setup.CameraVersion) == parse(Int, xml_data["CameraSetup"]["CameraVersion"])
+            @test Int(cf.header.setup.CameraVersion) ==
+                  parse(Int, xml_data["CameraSetup"]["CameraVersion"])
         end
     end
 end

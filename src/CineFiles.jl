@@ -1,10 +1,10 @@
 module CineFiles
 
-using ColorTypes: Color, N0f8, N6f10, N4f12, N0f16, Gray
+using ColorTypes: Color, N0f8, N6f10, N4f12, N0f16, gray, Gray, AbstractGray
 using ColorVectorSpace
 using LRUCache
 using StaticArrays: SizedMatrix, SizedVector
-using FixedPointNumbers: Normed
+using FixedPointNumbers: Normed, reinterpret, nbitsfrac
 
 import Base: eltype, length, size, getindex, firstindex, lastindex, iterate, read, read!
 export CineFile
@@ -14,44 +14,66 @@ include("LUT.jl")
 abstract type RawFrame end
 abstract type BinaryData end
 
+rawcounts(v::AbstractGray) = reinterpret(gray(v))
+
 struct Levels{T}
-    White::T
-    Black::T
+    white::T
+    black::T
 end
 
-function Levels{T}(W::S, B::S) where {T<:Color,S<:Int32}
-    scale = T(1).val.i |> Int64
+function Levels{T}(W::S, B::S) where {T<:AbstractGray, S<:Int32}
+    scale = rawcounts(T(1))
     Levels{T}(T(W / scale), T(B / scale))
 end
 
 struct Unpacked{T} <: RawFrame
-    Width::Int
-    Height::Int
+    width::Int
+    height::Int
     tmp::Array{T,2}
     unpacked::Array{T,2}
     levels::Levels
-    Unpacked{T}(Width, Height, WhiteL, BlackL) where {T<:Color} = new{T}(Width, Height, Array{T,2}(undef, Width, Height), Array{T,2}(undef, Width, Height), Levels{T}(WhiteL, BlackL))
+    Unpacked{T}(width, height, whiteL, blackL) where {T<:Color} = new{T}(
+        width,
+        height,
+        Array{T,2}(undef, width, height),
+        Array{T,2}(undef, width, height),
+        Levels{T}(whiteL, blackL),
+    )
 end
 
 struct Packed{T,S} <: RawFrame
-    Width::Int
-    Height::Int
+    width::Int
+    height::Int
     tmp::Array{S,2}
     unpacked::Array{T,2}
-    pack::Array{UInt8,1}
+    pack::Vector{UInt8}
     levels::Levels
 end
 
-function Packed{T,S}(Width, Height, WhiteL, BlackL) where {T<:Gray,S<:Gray}
-    true_bits = T.parameters[1].parameters[2] * Width * Height
+function Packed{T,S}(width, height, whiteL, blackL) where {T<:Gray,S<:Gray}
+    true_bits = nbitsfrac(eltype(T)) * width * height
     true_bytes = ceil(Int, true_bits / 8)
-    Packed{T,S}(Width, Height, Array{S,2}(undef, Width, Height), Array{T,2}(undef, Width, Height), Vector{UInt8}(undef, true_bytes), Levels{T}(WhiteL, BlackL))
+    Packed{T,S}(
+        width,
+        height,
+        Array{S,2}(undef, width, height),
+        Array{T,2}(undef, width, height),
+        Vector{UInt8}(undef, true_bytes),
+        Levels{T}(whiteL, blackL),
+    )
 end
 
-function Packed{T}(Width, Height, WhiteL, BlackL) where {T<:Gray}
-    true_bits = T.parameters[1].parameters[2] * Width * Height
+function Packed{T}(width, height, whiteL, blackL) where {T<:Gray}
+    true_bits = nbitsfrac(eltype(T)) * width * height
     true_bytes = ceil(Int, true_bits / 8)
-    Packed{T,T}(Width, Height, Array{T,2}(undef, Width, Height), Array{T,2}(undef, Width, Height), Vector{UInt8}(undef, true_bytes), Levels{T}(WhiteL, BlackL))
+    Packed{T,T}(
+        width,
+        height,
+        Array{T,2}(undef, width, height),
+        Array{T,2}(undef, width, height),
+        Vector{UInt8}(undef, true_bytes),
+        Levels{T}(whiteL, blackL),
+    )
 end
 
 struct Time64 <: BinaryData
@@ -302,32 +324,44 @@ end
 function unpack!(pack::Vector{UInt8}, unpacked::Array{Gray{N6f10}})
     pack16 = UInt16.(pack)
     indx = CartesianIndices(unpacked)[:, end:-1:1]
-    unpacked[indx[1:4:end]] = reinterpret.(N6f10, (pack16[1:5:end] .<< 2) .| (pack16[2:5:end] .>> 6))
-    unpacked[indx[2:4:end]] = reinterpret.(N6f10, ((pack16[2:5:end] .& 0b00111111) .<< 4) .| (pack16[3:5:end] .>> 4))
-    unpacked[indx[3:4:end]] = reinterpret.(N6f10, ((pack16[3:5:end] .& 0b00001111) .<< 6) .| (pack16[4:5:end] .>> 2))
-    unpacked[indx[4:4:end]] = reinterpret.(N6f10, ((pack16[4:5:end] .& 0b00000011) .<< 8) .| pack16[5:5:end])
+    unpacked[indx[1:4:end]] =
+        reinterpret.(N6f10, (pack16[1:5:end] .<< 2) .| (pack16[2:5:end] .>> 6))
+    unpacked[indx[2:4:end]] =
+        reinterpret.(
+            N6f10,
+            ((pack16[2:5:end] .& 0b00111111) .<< 4) .| (pack16[3:5:end] .>> 4),
+        )
+    unpacked[indx[3:4:end]] =
+        reinterpret.(
+            N6f10,
+            ((pack16[3:5:end] .& 0b00001111) .<< 6) .| (pack16[4:5:end] .>> 2),
+        )
+    unpacked[indx[4:4:end]] =
+        reinterpret.(N6f10, ((pack16[4:5:end] .& 0b00000011) .<< 8) .| pack16[5:5:end])
 end
 
 function unpack!(pack::Vector{UInt8}, unpacked::Array{Gray{N4f12}})
     @warn "unpacking 12 bit images untested"
     pack16 = UInt16.(pack)
     indx = CartesianIndices(unpacked)[:, end:-1:1]
-    unpacked[indx[1:2:end]] = reinterpret.(N6f10, (pack16[1:3:end] .<< 4) .| (pack16[2:3:end] .>> 4))
-    unpacked[indx[2:2:end]] = reinterpret.(N6f10, ((pack16[2:3:end] .& 0b00001111) .<< 8) .| (pack16[3:3:end]))
+    unpacked[indx[1:2:end]] =
+        reinterpret.(N6f10, (pack16[1:3:end] .<< 4) .| (pack16[2:3:end] .>> 4))
+    unpacked[indx[2:2:end]] =
+        reinterpret.(N6f10, ((pack16[2:3:end] .& 0b00001111) .<< 8) .| (pack16[3:3:end]))
 end
 
-function linearise!(raw_data::RawFrame)
-    Wlevel = raw_data.levels.White
-    Blevel = raw_data.levels.Black
+function linearize!(raw_data::RawFrame)
+    Wlevel = raw_data.levels.white
+    Blevel = raw_data.levels.black
     raw_data.tmp .= raw_data.unpacked
     raw_data.tmp[raw_data.tmp.>Wlevel] .= Wlevel
     raw_data.tmp[raw_data.tmp.<Blevel] .= Blevel
     raw_data.tmp .= (raw_data.tmp .- Blevel) ./ (Wlevel - Blevel)
 end
 
-function linearise!(raw_data::Packed{Gray{N6f10}})
+function linearize!(raw_data::Packed{Gray{N6f10}})
     Blevel, Wlevel = Gray{N4f12}.((64, 4064) ./ (2^12))
-    raw_data.tmp .= look_up.(raw_data.unpacked, Ref(lut))
+    raw_data.tmp .= lookup.(raw_data.unpacked, Ref(CINE_LUT))
     raw_data.tmp[raw_data.tmp.>Wlevel] .= Wlevel
     raw_data.tmp[raw_data.tmp.<Blevel] .= Blevel
     raw_data.tmp .= (raw_data.tmp .- Blevel) ./ (Wlevel - Blevel)
@@ -368,18 +402,35 @@ function CineHeader(fname)
         for i in eachindex(dt)
             fracstart = read(f, UInt32)
             secstart = read(f, UInt32)
-            dt[i] = (secstart - cine.TriggerTime.seconds) + ((fracstart - cine.TriggerTime.fractions) / 2^32)
+            dt[i] =
+                (secstart - cine.TriggerTime.seconds) +
+                ((fracstart - cine.TriggerTime.fractions) / 2^32)
         end
 
         # Packing options
         if bitmap.Compression == 0
-            raw = Unpacked{bittype}(bitmap.Width, bitmap.Height, setup.WhiteLevel, setup.BlackLevel)
+            raw = Unpacked{bittype}(
+                bitmap.Width,
+                bitmap.Height,
+                setup.WhiteLevel,
+                setup.BlackLevel,
+            )
             return CineHeader{bittype}(cine, bitmap, setup, imglocs, imgoffset, dt, raw)
         elseif bitmap.Compression == 256
-            raw = Packed{bittype,Gray{N6f10}}(bitmap.Width, bitmap.Height, setup.WhiteLevel, setup.BlackLevel)
+            raw = Packed{bittype,Gray{N6f10}}(
+                bitmap.Width,
+                bitmap.Height,
+                setup.WhiteLevel,
+                setup.BlackLevel,
+            )
             return CineHeader{Gray{N4f12}}(cine, bitmap, setup, imglocs, imgoffset, dt, raw)
         elseif bitmap.Compression == 1024
-            raw = Packed{bittype,Gray{N4f12}}(bitmap.Width, bitmap.Height, setup.WhiteLevel, setup.BlackLevel)
+            raw = Packed{bittype,Gray{N4f12}}(
+                bitmap.Width,
+                bitmap.Height,
+                setup.WhiteLevel,
+                setup.BlackLevel,
+            )
             return CineHeader{bittype}(cine, bitmap, setup, imglocs, imgoffset, dt, raw)
         end
     end
@@ -390,7 +441,7 @@ function readframe!(f::IO, frame, h, frameidx)
     seek(f, h.imglocs[frameidx])
     skip(f, read(f, UInt32) - 4)
     read!(f, h.raw)
-    linearise!(h.raw)
+    linearize!(h.raw)
     # non-allocating version of rotl90
     ind1, ind2 = axes(h.raw.tmp)
     n = first(ind2) + last(ind2)
@@ -406,10 +457,13 @@ function read!(f::IOStream, frame::Packed)
 end
 
 read!(f::IOStream, frame::Unpacked) = read!(f, frame.unpacked)
+# TODO: implement with lower compilation overhead
 read(f::IOStream, S::Type{T}) where {T<:BinaryData} = S(read.(Ref(f), S.types)...)
 
-readframe!(filename, frame, h, frameidx) = open(f -> readframe!(f, frame, h, frameidx), filename)
-readframe(f, h, frameidx) = readframe!(f, similar(h.raw.tmp, size(h.raw.tmp, 2), size(h.raw.tmp, 1)), h, frameidx)
+readframe!(filename, frame, h, frameidx) =
+    open(f -> readframe!(f, frame, h, frameidx), filename)
+readframe(f, h, frameidx) =
+    readframe!(f, similar(h.raw.tmp, size(h.raw.tmp, 2), size(h.raw.tmp, 1)), h, frameidx)
 
 """
     CineFile(filepath, cachelimit=0.25)
@@ -442,5 +496,15 @@ Base.firstindex(cf::CineFile) = 1
 Base.lastindex(cf::CineFile) = length(cf)
 Base.getindex(cf::CineFile, I) = [cf[i] for i in I]
 Base.iterate(cf::CineFile, state = 1) = state > length(cf) ? nothing : (cf[state], state + 1)
+
+# precompile as the final step of the module definition:
+if ccall(:jl_generating_output, Cint, ()) == 1   # if we're precompiling the package
+    let
+        precompile(read, (IOStream, SetupHeader))
+
+        # CineFile(joinpath(dirname(@__DIR__), "test/data/8bpp.cine"))[1]
+    end
+end
+
 
 end

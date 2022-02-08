@@ -1,4 +1,5 @@
 [deps]
+FixedPointNumbers = "53c48c17-4a7d-5ca2-90c5-79b7896eea93"
 Glob = "c27321d9-0574-5035-807b-f59d2c89b15c"
 ImageCore = "a09fc81d-aa75-5fe9-8630-4744c3626534"
 Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
