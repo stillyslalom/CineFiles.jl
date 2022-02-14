@@ -3,16 +3,34 @@ module CineFiles
 using ColorTypes: Color, N0f8, N6f10, N4f12, N0f16, gray, Gray, AbstractGray
 using ColorVectorSpace
 using LRUCache
-using StaticArrays: SizedMatrix, SizedVector
 using FixedPointNumbers: Normed, reinterpret, nbitsfrac
 
-import Base: eltype, length, size, getindex, firstindex, lastindex, iterate, read, read!
+import Base: eltype, length, size, getindex, firstindex, lastindex, iterate, read, read!, setindex!
 export CineFile
 
 include("LUT.jl")
 
 abstract type RawFrame end
 abstract type BinaryData end
+
+struct AlArray{S,T,N} <: AbstractArray{T,N} where {S}
+    data::Array{T,N}
+    function AlArray{S,T}(data) where {S,T}
+        if S isa Tuple
+            size(data) == S || error("Array size mismatch")
+        end
+        if S isa Int 
+            length(data) == S || error("Array size mismatch")
+        end
+        new{S,T,length(S)}(data)
+    end
+end
+
+size(A::AlArray) = size(A.data)
+getindex(A::AlArray{S,T,N}, inds::Vararg{Int,N}) where {S,T,N} = A.data[inds...]
+setindex!(A::AlArray{S,T,N}, val, inds::Vararg{Int,N}) where {S,T,N} = A.data[inds...] = val
+
+read(f::IOStream, S::Type{T}) where {T<:AlArray} = S(read!(f, Array{S.body.parameters[2],length(S.body.parameters[1])}(undef, S.body.parameters[1]...)))
 
 rawcounts(v::AbstractGray) = reinterpret(gray(v))
 
@@ -90,7 +108,7 @@ struct IMfilter <: BinaryData
     Dim::Int32
     Shifts::Int32
     Bias::Int32
-    Coef::SizedMatrix{5,5,Int32,2,Matrix{Int32}}
+    Coef::AlArray{(5,5),Int32}
 end
 
 struct Rect <: BinaryData
@@ -131,27 +149,27 @@ struct SetupHeader <: BinaryData
     Res11::UInt8
     TrigFrame::UInt8
     Res12::UInt8
-    DescriptionOld::SizedVector{121,Int8}
+    DescriptionOld::AlArray{121,Int8}
     Mark::UInt16
     Length::UInt16
     Res13::UInt16
     SigOption::UInt16
     BinChannels::Int16
     SamplesPerImage::UInt8
-    BinName::SizedMatrix{8,11,Int8}
+    BinName::AlArray{(8,11),Int8}
     AnaOption::UInt16
     AnaChannels::Int16
     Res6::UInt8
     AnaBoard::UInt8
-    ChOption::SizedVector{8,Int16}
-    AnaGain::SizedVector{8,Float32}
-    AnaUnit::SizedMatrix{8,6,Int8}
-    AnaName::SizedMatrix{8,11,Int8}
+    ChOption::AlArray{8,Int16}
+    AnaGain::AlArray{8,Float32}
+    AnaUnit::AlArray{(8,6),Int8}
+    AnaName::AlArray{(8,11),Int8}
     lFirstImage::Int32
     dwImageCount::UInt32
     nQFactor::Int16
     wCineFileType::UInt16
-    szCinePath::SizedMatrix{4,65,Int8}
+    szCinePath::AlArray{(4,65),Int8}
     Res14::UInt16
     Res15::UInt8
     Res16::UInt8
@@ -190,7 +208,7 @@ struct SetupHeader <: BinaryData
     AutoExpLevel::UInt32
     AutoExpSpeed::UInt32
     AutoExpRect::Rect
-    WBGain::SizedVector{4,WBgain}
+    WBGain::AlArray{4,WBgain}
     Rotate::Int32
     WBView::WBgain
     RealBPP::UInt32
@@ -205,11 +223,11 @@ struct SetupHeader <: BinaryData
     bStampTime::Int32
     SoundDest::UInt32
     FRPSteps::UInt32
-    FRPImgNr::SizedVector{16,Int32}
-    FRPRate::SizedVector{16,UInt32}
-    FRPExp::SizedVector{16,UInt32}
+    FRPImgNr::AlArray{16,Int32}
+    FRPRate::AlArray{16,UInt32}
+    FRPExp::AlArray{16,UInt32}
     MCCnt::Int32
-    MCPercent::SizedVector{64,Float32}
+    MCPercent::AlArray{64,Float32}
     CICalib::UInt32
     CalibWidth::UInt32
     CalibHeight::UInt32
@@ -217,7 +235,7 @@ struct SetupHeader <: BinaryData
     CalibExp::UInt32
     CalibEDR::UInt32
     CalibTemp::UInt32
-    HeadSerial::SizedVector{4,UInt32}
+    HeadSerial::AlArray{4,UInt32}
     RangeCode::UInt32
     RangeSize::UInt32
     Decimation::UInt32
@@ -230,17 +248,17 @@ struct SetupHeader <: BinaryData
     ImPosYAcq::UInt32
     ImWidthAcq::UInt32
     ImHeightAcq::UInt32
-    Description::SizedVector{4096,Int8}
+    Description::AlArray{4096,Int8}
     RisingEdge::Int32
     FilterTime::UInt32
     LongReady::Int32
     ShutterOff::Int32
-    Res4::SizedVector{16,UInt8}
+    Res4::AlArray{16,UInt8}
     bMetaWB::Int32
     Hue::Int32
     BlackLevel::Int32
     WhiteLevel::Int32
-    LensDescription::SizedVector{256,Int8}
+    LensDescription::AlArray{256,Int8}
     LensAperture::Float32
     LensFocusDistance::Float32
     LensFocalLength::Float32
@@ -256,23 +274,23 @@ struct SetupHeader <: BinaryData
     fPedestalG::Float32
     fPedestalB::Float32
     fChroma::Float32
-    ToneLabel::SizedVector{256,Int8}
+    ToneLabel::AlArray{256,Int8}
     TonePoints::Int32
-    fTone::SizedVector{64,Float32}
-    UserMatrixLabel::SizedVector{256,Int8}
+    fTone::AlArray{64,Float32}
+    UserMatrixLabel::AlArray{256,Int8}
     EnableMatrices::Int32
-    fUserMatrix::SizedVector{9,Float32}
+    fUserMatrix::AlArray{9,Float32}
     EnableCrop::Int32
     CropRect::Rect
     EnableResample::Int32
     ResampleWidth::UInt32
     ResampleHeight::UInt32
     fGain16_8::Float32
-    FRPShape::SizedVector{16,UInt32}
+    FRPShape::AlArray{16,UInt32}
     TrigTC::TimeCode
     fPbRate::Float32
     fTcRate::Float32
-    CineName::SizedVector{256,UInt8}
+    CineName::AlArray{256,UInt8}
 end
 
 struct CineFileHeader <: BinaryData
@@ -505,6 +523,5 @@ if ccall(:jl_generating_output, Cint, ()) == 1   # if we're precompiling the pac
         # CineFile(joinpath(dirname(@__DIR__), "test/data/8bpp.cine"))[1]
     end
 end
-
 
 end
