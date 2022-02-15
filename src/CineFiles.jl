@@ -27,10 +27,11 @@ struct AlArray{S,T,N} <: AbstractArray{T,N} where {S}
 end
 
 size(A::AlArray) = size(A.data)
+size(::Type{AlArray{S,T}}) where {S,T} = Tuple(S)
 getindex(A::AlArray{S,T,N}, inds::Vararg{Int,N}) where {S,T,N} = A.data[inds...]
 setindex!(A::AlArray{S,T,N}, val, inds::Vararg{Int,N}) where {S,T,N} = A.data[inds...] = val
 
-read(f::IOStream, S::Type{T}) where {T<:AlArray} = S(read!(f, Array{S.body.parameters[2],length(S.body.parameters[1])}(undef, S.body.parameters[1]...)))
+read(f::IOStream, A::Type{AlArray{S,T}}) where {S,T} = A(read!(f, Array{T,length(S)}(undef, S)))
 
 rawcounts(v::AbstractGray) = reinterpret(gray(v))
 
