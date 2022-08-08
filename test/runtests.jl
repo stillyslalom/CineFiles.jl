@@ -30,12 +30,12 @@ function cine_test_files(cine_path::String)
     end
 end
 
-function compare_images(cine_file, tiff_image, frame_no = 1)
+function compare_images(cine_file, tiff_image, frame_no=1)
     cine_frame = cine_file[frame_no]
     cine_frame_gamma = (cine_frame) .+ cine_file.header.setup.fOffset
     # Have not included gamma adjustment yet
     cine_frame_gamma[cine_frame_gamma.<0] .= 0
-    return all(isapprox.(cine_frame_gamma, tiff_image; atol = 0.01))
+    return all(isapprox.(cine_frame_gamma, tiff_image; atol=0.01))
 end
 
 cine_file_paths = cine_test_files.(glob("*.cine", "data"))
@@ -44,11 +44,11 @@ append!(cine_file_paths, cine_test_files.(glob("*.cine", "proprietary_data")))
 @testset "CineFiles.jl" begin
     @testset "Dependency internals" begin
         # nbitsfrac is unexported, so we'll test to make sure it doesn't break
-        @test nbitsfrac(N0f8)  == 8
+        @test nbitsfrac(N0f8) == 8
         @test nbitsfrac(N4f12) == 12
         @test nbitsfrac(N0f16) == 16
     end
-    
+
     @time cf8 = CineFile(joinpath("data", "8bpp.cine"))
     @testset "8 bit grayscale" begin
         @test length(cf8) == 202

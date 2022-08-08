@@ -19,7 +19,7 @@ struct AlArray{S,T,N} <: AbstractArray{T,N} where {S}
         if S isa Tuple
             size(data) == S || error("Array size mismatch")
         end
-        if S isa Int 
+        if S isa Int
             length(data) == S || error("Array size mismatch")
         end
         new{S,T,length(S)}(data)
@@ -40,7 +40,7 @@ struct Levels{T}
     black::T
 end
 
-function Levels{T}(W::S, B::S) where {T<:AbstractGray, S<:Int32}
+function Levels{T}(W::S, B::S) where {T<:AbstractGray,S<:Int32}
     scale = rawcounts(T(1))
     Levels{T}(T(W / scale), T(B / scale))
 end
@@ -109,7 +109,7 @@ struct IMfilter <: BinaryData
     Dim::Int32
     Shifts::Int32
     Bias::Int32
-    Coef::AlArray{(5,5),Int32}
+    Coef::AlArray{(5, 5),Int32}
 end
 
 struct Rect <: BinaryData
@@ -157,20 +157,20 @@ struct SetupHeader <: BinaryData
     SigOption::UInt16
     BinChannels::Int16
     SamplesPerImage::UInt8
-    BinName::AlArray{(8,11),Int8}
+    BinName::AlArray{(8, 11),Int8}
     AnaOption::UInt16
     AnaChannels::Int16
     Res6::UInt8
     AnaBoard::UInt8
     ChOption::AlArray{8,Int16}
     AnaGain::AlArray{8,Float32}
-    AnaUnit::AlArray{(8,6),Int8}
-    AnaName::AlArray{(8,11),Int8}
+    AnaUnit::AlArray{(8, 6),Int8}
+    AnaName::AlArray{(8, 11),Int8}
     lFirstImage::Int32
     dwImageCount::UInt32
     nQFactor::Int16
     wCineFileType::UInt16
-    szCinePath::AlArray{(4,65),Int8}
+    szCinePath::AlArray{(4, 65),Int8}
     Res14::UInt16
     Res15::UInt8
     Res16::UInt8
@@ -324,7 +324,7 @@ struct BitmapInfoHeader <: BinaryData
     FPS::UInt16
 end
 
-struct CineHeader{T, R<:RawFrame}
+struct CineHeader{T,R<:RawFrame}
     cine::CineFileHeader
     bitmap::BitmapInfoHeader
     setup::SetupHeader
@@ -369,7 +369,7 @@ function unpack!(pack::Vector{UInt8}, unpacked::Array{Gray{N4f12}})
         reinterpret.(N6f10, ((pack16[2:3:end] .& 0b00001111) .<< 8) .| (pack16[3:3:end]))
 end
 
-function linearize!(raw_data::R) where {R <: RawFrame}
+function linearize!(raw_data::R) where {R<:RawFrame}
     Wlevel = raw_data.levels.white
     Blevel = raw_data.levels.black
     raw_data.tmp .= raw_data.unpacked
@@ -382,8 +382,8 @@ end
 function linearize!(raw_data::Packed{Gray{N6f10}})
     Blevel, Wlevel = Gray{N4f12}.((64, 4064) ./ (2^12))
     raw_data.tmp .= lookup.(raw_data.unpacked, Ref(CINE_LUT))
-    raw_data.tmp[raw_data.tmp.>Wlevel] .= Wlevel
-    raw_data.tmp[raw_data.tmp.<Blevel] .= Blevel
+    raw_data.tmp[raw_data.tmp .> Wlevel] .= Wlevel
+    raw_data.tmp[raw_data.tmp .< Blevel] .= Blevel
     raw_data.tmp .= (raw_data.tmp .- Blevel) ./ (Wlevel - Blevel)
 end
 
@@ -453,7 +453,7 @@ function CineHeader(fname)
             )
             pixeltype = bittype
         end
-        return CineHeader{pixeltype, typeof(raw)}(cine, bitmap, setup, imglocs, imgoffset, dt, raw)
+        return CineHeader{pixeltype,typeof(raw)}(cine, bitmap, setup, imglocs, imgoffset, dt, raw)
     end
 end
 
@@ -494,11 +494,11 @@ Load header information and create a frame cache for a Phantom .cine file.
     your system's free RAM. Indexing and iteration is supported for CineFiles.
 
 """
-function CineFile(filepath, cachelimit = 0.25)
+function CineFile(filepath, cachelimit=0.25)
     header = CineHeader(filepath)
     framesize = Base.summarysize(header.raw.tmp)
     maxcachedframes = ceil(Int, cachelimit * Sys.free_memory() / framesize)
-    data = LRU{Int,Array{eltype(header),2}}(maxsize = maxcachedframes)
+    data = LRU{Int,Array{eltype(header),2}}(maxsize=maxcachedframes)
     return CineFile(filepath, header, data)
 end
 
@@ -516,7 +516,7 @@ end
 Base.firstindex(cf::CineFile) = 1
 Base.lastindex(cf::CineFile) = length(cf)
 Base.getindex(cf::CineFile, I) = [cf[i] for i in I]
-Base.iterate(cf::CineFile, state = 1) = state > length(cf) ? nothing : (cf[state], state + 1)
+Base.iterate(cf::CineFile, state=1) = state > length(cf) ? nothing : (cf[state], state + 1)
 
 # precompile as the final step of the module definition:
 if ccall(:jl_generating_output, Cint, ()) == 1   # if we're precompiling the package
