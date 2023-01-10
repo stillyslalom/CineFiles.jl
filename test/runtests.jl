@@ -1,6 +1,5 @@
 using CineFiles
 using ImageCore
-using Images: load
 using TiffImages
 using Test
 using Glob
@@ -74,7 +73,7 @@ append!(cine_file_paths, cine_test_files.(glob("*.cine", "proprietary_data")))
         for file in cine_file_paths
             @info file.cine_path
             cf = CineFile(file.cine_path)
-            tiff_img = load(file.first_frame_path)
+            tiff_img = TiffImages.load(file.first_frame_path)
             @test compare_images(cf, tiff_img)
         end
     end

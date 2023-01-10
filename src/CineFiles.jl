@@ -324,7 +324,7 @@ struct BitmapInfoHeader <: BinaryData
     FPS::UInt16
 end
 
-struct CineHeader{T,R<:RawFrame}
+struct CineHeader{T, R}
     cine::CineFileHeader
     bitmap::BitmapInfoHeader
     setup::SetupHeader
@@ -334,9 +334,9 @@ struct CineHeader{T,R<:RawFrame}
     raw::R
 end
 
-struct CineFile{T}
+struct CineFile{T,R<:RawFrame}
     path::String
-    header::CineHeader{T}
+    header::CineHeader{T,R}
     data::LRU{Int,Array{T,2}}
 end
 
