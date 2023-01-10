@@ -5,6 +5,7 @@ using Test
 using Glob
 using XMLDict: parse_xml
 using FixedPointNumbers: nbitsfrac
+using Aqua
 
 # In order to test against arbitary cine files, export tif image of first frame with gamma = 1
 # and xml file using PCC. Ensure the cine file, tif image and xml file have the same name and 
@@ -89,3 +90,4 @@ append!(cine_file_paths, cine_test_files.(glob("*.cine", "proprietary_data")))
     end
 end
 
+Aqua.test_all(CineFiles)
