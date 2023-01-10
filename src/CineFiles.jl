@@ -340,6 +340,10 @@ struct CineFile{T,R<:RawFrame}
     data::LRU{Int,Array{T,2}}
 end
 
+function Base.show(io::IO, cf::CineFile{T}) where {T}
+    print(io, length(cf.header.dt), "-frame CineFile{$T}", reverse(size(cf.header.raw.tmp)))
+end
+
 function unpack!(pack::Vector{UInt8}, unpacked::Array{Gray{N6f10}})
     pack16 = UInt16.(pack)
     indx = CartesianIndices(unpacked)[:, end:-1:1]
