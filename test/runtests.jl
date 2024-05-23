@@ -88,6 +88,12 @@ append!(cine_file_paths, cine_test_files.(glob("*.cine", "proprietary_data")))
                   parse(Int, xml_data["CameraSetup"]["CameraVersion"])
         end
     end
+
+    @testset "Correct calculation of frame timestamps" begin
+        cf = CineFile(joinpath("data", "dt_test.cine"))
+        Δt = diff(cf.header.dt)
+        @test all(dt -> isapprox(dt, Δt[1], rtol=5e-8), Δt)
+    end
 end
 
 Aqua.test_all(CineFiles)
