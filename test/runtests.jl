@@ -41,6 +41,9 @@ end
 cine_file_paths = cine_test_files.(glob("*.cine", "data"))
 append!(cine_file_paths, cine_test_files.(glob("*.cine", "proprietary_data")))
 
+# Don't perform xml/tif cross-verification on dt_test cine file
+filter!(f -> !occursin("dt_test", f), cine_file_paths)
+
 @testset "CineFiles.jl" begin
     @testset "Dependency internals" begin
         # nbitsfrac is unexported, so we'll test to make sure it doesn't break
