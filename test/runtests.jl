@@ -38,11 +38,11 @@ function compare_images(cine_file, tiff_image, frame_no=1)
     return all(isapprox.(cine_frame_gamma, tiff_image; atol=0.01))
 end
 
-cine_file_paths = cine_test_files.(glob("*.cine", "data"))
-append!(cine_file_paths, cine_test_files.(glob("*.cine", "proprietary_data")))
-
+cine_base_paths = glob("*.cine", "data")
 # Don't perform xml/tif cross-verification on dt_test cine file
-filter!(f -> !occursin("dt_test", f), cine_file_paths)
+filter!(f -> !occursin("dt_test", f), cine_base_paths)
+cine_file_paths = cine_test_files.(cine_base_paths)
+append!(cine_file_paths, cine_test_files.(glob("*.cine", "proprietary_data")))
 
 @testset "CineFiles.jl" begin
     @testset "Dependency internals" begin
