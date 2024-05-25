@@ -424,11 +424,11 @@ function CineHeader(fname)
         dt = zeros(cine.ImageCount)
         skip(f, 2)
         for i in eachindex(dt)
-            fracstart = read(f, UInt32)/4/2^30
+            fracstart = read(f, UInt32)
             secstart = read(f, UInt32)
             dt[i] =
                 (secstart - cine.TriggerTime.seconds) +
-                ((fracstart - cine.TriggerTime.fractions/4/2^30) )
+                ((fracstart / 2^32  - cine.TriggerTime.fractions / 2^32 ))
         end
 
         # Packing options
