@@ -428,7 +428,7 @@ function CineHeader(fname)
             secstart = read(f, UInt32)
             dt[i] =
                 (secstart - cine.TriggerTime.seconds) +
-                ((fracstart - cine.TriggerTime.fractions) / 2^32)
+                ((fracstart / 2^32  - cine.TriggerTime.fractions / 2^32 ))
         end
 
         # Packing options

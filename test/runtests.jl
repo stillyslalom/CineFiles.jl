@@ -38,7 +38,10 @@ function compare_images(cine_file, tiff_image, frame_no=1)
     return all(isapprox.(cine_frame_gamma, tiff_image; atol=0.01))
 end
 
-cine_file_paths = cine_test_files.(glob("*.cine", "data"))
+cine_base_paths = glob("*.cine", "data")
+# Don't perform xml/tif cross-verification on dt_test cine file
+filter!(f -> !occursin("dt_test", f), cine_base_paths)
+cine_file_paths = cine_test_files.(cine_base_paths)
 append!(cine_file_paths, cine_test_files.(glob("*.cine", "proprietary_data")))
 
 @testset "CineFiles.jl" begin
@@ -87,6 +90,12 @@ append!(cine_file_paths, cine_test_files.(glob("*.cine", "proprietary_data")))
             @test Int(cf.header.setup.CameraVersion) ==
                   parse(Int, xml_data["CameraSetup"]["CameraVersion"])
         end
+    end
+
+    @testset "Correct calculation of frame timestamps" begin
+        cf = CineFile(joinpath("data", "dt_test.cine"))
+        Δt = diff(cf.header.dt)
+        @test all(dt -> isapprox(dt, Δt[1], rtol=5e-8), Δt)
     end
 end
 
