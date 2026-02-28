@@ -5,7 +5,6 @@ using ColorVectorSpace
 using LRUCache
 using FixedPointNumbers: Normed, reinterpret, nbitsfrac
 
-import Base: eltype, length, size, getindex, firstindex, lastindex, iterate, read, read!, setindex!
 export CineFile
 
 include("LUT.jl")
@@ -26,12 +25,12 @@ struct AlArray{S,T,N} <: AbstractArray{T,N} where {S}
     end
 end
 
-size(A::AlArray) = size(A.data)
-size(::Type{AlArray{S,T}}) where {S,T} = Tuple(S)
-getindex(A::AlArray{S,T,N}, inds::Vararg{Int,N}) where {S,T,N} = A.data[inds...]
-setindex!(A::AlArray{S,T,N}, val, inds::Vararg{Int,N}) where {S,T,N} = A.data[inds...] = val
+Base.size(A::AlArray) = size(A.data)
+Base.size(::Type{AlArray{S,T}}) where {S,T} = Tuple(S)
+Base.getindex(A::AlArray{S,T,N}, inds::Vararg{Int,N}) where {S,T,N} = A.data[inds...]
+Base.setindex!(A::AlArray{S,T,N}, val, inds::Vararg{Int,N}) where {S,T,N} = A.data[inds...] = val
 
-read(f::IOStream, A::Type{AlArray{S,T}}) where {S,T} = A(read!(f, Array{T,length(S)}(undef, S)))
+Base.read(f::IOStream, A::Type{AlArray{S,T}}) where {S,T} = A(read!(f, Array{T,length(S)}(undef, S)))
 
 rawcounts(v::AbstractGray) = reinterpret(gray(v))
 
@@ -66,6 +65,7 @@ struct Packed{T,S} <: RawFrame{T}
     tmp::Array{S,2}
     unpacked::Array{T,2}
     pack::Vector{UInt8}
+    pack16::Vector{UInt16}
     levels::Levels{T}
 end
 
@@ -78,6 +78,7 @@ function Packed{T,S}(width, height, whiteL, blackL) where {T<:Gray,S<:Gray}
         Array{S,2}(undef, width, height),
         Array{T,2}(undef, width, height),
         Vector{UInt8}(undef, true_bytes),
+        Vector{UInt16}(undef, true_bytes),
         Levels{T}(whiteL, blackL),
     )
 end
@@ -91,6 +92,7 @@ function Packed{T}(width, height, whiteL, blackL) where {T<:Gray}
         Array{T,2}(undef, width, height),
         Array{T,2}(undef, width, height),
         Vector{UInt8}(undef, true_bytes),
+        Vector{UInt16}(undef, true_bytes),
         Levels{T}(whiteL, blackL),
     )
 end
@@ -344,8 +346,7 @@ function Base.show(io::IO, cf::CineFile{T}) where {T}
     print(io, length(cf.header.dt), "-frame CineFile{$T}", reverse(size(cf.header.raw.tmp)))
 end
 
-function unpack!(pack::Vector{UInt8}, unpacked::Array{Gray{N6f10}})
-    pack16 = UInt16.(pack)
+function unpack!(pack16::Vector{UInt16}, unpacked::Array{Gray{N6f10}})
     indx = CartesianIndices(unpacked)[:, end:-1:1]
     unpacked[indx[1:4:end]] =
         reinterpret.(N6f10, (pack16[1:5:end] .<< 2) .| (pack16[2:5:end] .>> 6))
@@ -363,14 +364,13 @@ function unpack!(pack::Vector{UInt8}, unpacked::Array{Gray{N6f10}})
         reinterpret.(N6f10, ((pack16[4:5:end] .& 0b00000011) .<< 8) .| pack16[5:5:end])
 end
 
-function unpack!(pack::Vector{UInt8}, unpacked::Array{Gray{N4f12}})
+function unpack!(pack16::Vector{UInt16}, unpacked::Array{Gray{N4f12}})
     @warn "unpacking 12 bit images untested"
-    pack16 = UInt16.(pack)
     indx = CartesianIndices(unpacked)[:, end:-1:1]
     unpacked[indx[1:2:end]] =
-        reinterpret.(N6f10, (pack16[1:3:end] .<< 4) .| (pack16[2:3:end] .>> 4))
+        reinterpret.(N4f12, (pack16[1:3:end] .<< 4) .| (pack16[2:3:end] .>> 4))
     unpacked[indx[2:2:end]] =
-        reinterpret.(N6f10, ((pack16[2:3:end] .& 0b00001111) .<< 8) .| (pack16[3:3:end]))
+        reinterpret.(N4f12, ((pack16[2:3:end] .& 0b00001111) .<< 8) .| (pack16[3:3:end]))
 end
 
 function linearize!(raw_data::R) where {R<:RawFrame}
@@ -386,9 +386,10 @@ end
 function linearize!(raw_data::Packed{Gray{N6f10}})
     Blevel, Wlevel = Gray{N4f12}.((64, 4064) ./ (2^12))
     raw_data.tmp .= lookup.(raw_data.unpacked, Ref(CINE_LUT))
-    raw_data.tmp[raw_data.tmp .> Wlevel] .= Wlevel
-    raw_data.tmp[raw_data.tmp .< Blevel] .= Blevel
-    raw_data.tmp .= (raw_data.tmp .- Blevel) ./ (Wlevel - Blevel)
+    clamp!(raw_data.tmp, Blevel, Wlevel)
+    @inbounds for idx in eachindex(raw_data.tmp)
+        raw_data.tmp[idx] = (raw_data.tmp[idx] - Blevel) / (Wlevel - Blevel)
+    end
 end
 
 function CineHeader(fname)
@@ -408,6 +409,8 @@ function CineHeader(fname)
             bittype = Gray{Normed{bitsized,Int(setup.RealBPP)}}
         elseif (bitmap.BitCount == 24) || (bitmap.BitCount == 36)
             bittype = BGR{Normed{bitsized,Int(setup.RealBPP)}}
+        else
+            error("unsupported BitCount: $(bitmap.BitCount)")
         end
 
         cine.ImageCount > 0 || error("no images exist in file")
@@ -417,9 +420,10 @@ function CineHeader(fname)
 
         seekstart(f)
         imgoffset = 1
-        while read(f, UInt16) != 1002
+        while !eof(f) && read(f, UInt16) != 1002
             imgoffset += 1
         end
+        eof(f) && error("timestamp annotation marker (1002) not found")
 
         dt = zeros(cine.ImageCount)
         skip(f, 2)
@@ -427,7 +431,7 @@ function CineHeader(fname)
             fracstart = read(f, UInt32)
             secstart = read(f, UInt32)
             dt[i] =
-                (secstart - cine.TriggerTime.seconds) +
+                (Float64(secstart) - Float64(cine.TriggerTime.seconds)) +
                 ((fracstart / 2^32  - cine.TriggerTime.fractions / 2^32 ))
         end
 
@@ -456,13 +460,15 @@ function CineHeader(fname)
                 setup.BlackLevel,
             )
             pixeltype = bittype
+        else
+            error("unsupported Compression: $(bitmap.Compression)")
         end
         return CineHeader{pixeltype,typeof(raw)}(cine, bitmap, setup, imglocs, imgoffset, dt, raw)
     end
 end
 
 function readframe!(f::IO, frame, h, frameidx)
-    1 <= frameidx <= h.cine.ImageCount || BoundsError(h.dt, frameidx)
+    1 <= frameidx <= h.cine.ImageCount || throw(BoundsError(h.dt, frameidx))
     seek(f, h.imglocs[frameidx])
     skip(f, read(f, UInt32) - 4)
     read!(f, h.raw)
@@ -476,14 +482,15 @@ function readframe!(f::IO, frame, h, frameidx)
     return frame
 end
 
-function read!(f::IOStream, frame::Packed)
+function Base.read!(f::IOStream, frame::Packed)
     read!(f, frame.pack)
-    unpack!(frame.pack, frame.unpacked)
+    frame.pack16 .= UInt16.(frame.pack)
+    unpack!(frame.pack16, frame.unpacked)
 end
 
-read!(f::IOStream, frame::Unpacked) = read!(f, frame.unpacked)
+Base.read!(f::IOStream, frame::Unpacked) = read!(f, frame.unpacked)
 # TODO: implement with lower compilation overhead
-read(f::IOStream, S::Type{T}) where {T<:BinaryData} = S((read(f, FT) for FT in fieldtypes(T))...)# in field.(Ref(f), S.types)...)
+Base.read(f::IOStream, S::Type{T}) where {T<:BinaryData} = S((read(f, FT) for FT in fieldtypes(T))...)# in field.(Ref(f), S.types)...)
 
 readframe!(filename, frame, h, frameidx) =
     open(f -> readframe!(f, frame, h, frameidx), filename)
@@ -528,7 +535,7 @@ if ccall(:jl_generating_output, Cint, ()) == 1   # if we're precompiling the pac
         datadir = joinpath(splitpath(@__DIR__)[1:end-1]..., "test", "data")
         s = Gray{Float32}(0.0)
         for fmt in ("8bpp", "12bpp", "packed_10")
-            collect(CineFile(joinpath(datadir, "$fmt.cine"), 0))
+            CineFile(joinpath(datadir, "$fmt.cine"), 0)[1]
         end
     end
 end

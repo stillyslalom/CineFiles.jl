@@ -52,7 +52,7 @@ append!(cine_file_paths, cine_test_files.(glob("*.cine", "proprietary_data")))
         @test nbitsfrac(N0f16) == 16
     end
 
-    @time cf8 = CineFile(joinpath("data", "8bpp.cine"))
+    cf8 = CineFile(joinpath("data", "8bpp.cine"))
     @testset "8 bit grayscale" begin
         @test length(cf8) == 202
         @test size(cf8[1]) == (16, 128)
@@ -70,7 +70,6 @@ append!(cine_file_paths, cine_test_files.(glob("*.cine", "proprietary_data")))
 
     first_load_time = (@elapsed cf12[2])
     cached_load_time = (@elapsed cf12[2])
-    @show first_load_time, cached_load_time
     @test first_load_time > cached_load_time
 
     @testset "Tiff compare first frame" begin
