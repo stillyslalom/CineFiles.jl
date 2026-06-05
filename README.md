@@ -60,7 +60,7 @@ julia> cf = CineFile("video.cine", 0.5)  # use up to 50% of free RAM for cache
 julia> length(cf)
 202
 
-julia> mean_intensity = sum(Float64.(gray.(frame)) for frame in cf) ./ length(cf);
+julia> mean_intensity = mean(cf)
 ```
 
 ### Installation
